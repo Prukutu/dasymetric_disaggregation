@@ -2,6 +2,7 @@ import geopandas
 
 # TODO: write disaggregate_data method
 # TODO: document all methods
+#### HOLA LUIS ESTE ES UN INTENTO DE PUSH
 class DasymetryDisaggregate:
     """ Class collecting tools to disaggregate socio-demographic data into
         discrete parcels.
