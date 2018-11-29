@@ -12,6 +12,18 @@ class DasymetryDisaggregate:
         return None
 
     def load_parcels(self, filename):
+        """ Method to load parcel geometry. Uses geopandas to load a shapefile
+            into a GeoDataFrame.
+
+            Input:
+            ------
+            filename: string describing parcel file name. Directory must contain
+            all relevant files.
+
+            Output:
+            -------
+            parcel_df: GeoDataFrame object containing parcel data and geometry.
+        """
 
         print('Loading parcel data...')
 
@@ -22,7 +34,7 @@ class DasymetryDisaggregate:
         return self.parcel_df
 
     def load_source_data(self, filename):
-        # Load data to disaggregate. Join with geometry
+        # Load data to disaggregate into all parcels.
         return None
 
     def disaggregate_data(self, parceldata, sourcedata):
