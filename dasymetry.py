@@ -22,9 +22,10 @@ class DasymetryDisaggregate:
         return self.parcel_df
 
     def load_source_data(self, filename):
-
+        # Load data to disaggregate. Join with geometry
         return None
 
     def disaggregate_data(self, parceldata, sourcedata):
+        # Following the work of Dahal and McPhearson (in preparation)
 
         return None
