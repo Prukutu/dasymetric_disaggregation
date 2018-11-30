@@ -62,4 +62,5 @@ class DasymetryDisaggregate:
         return None
 
     def write_output(self, outputfilename, outputdir='output/'):
-        
+
+        return None
