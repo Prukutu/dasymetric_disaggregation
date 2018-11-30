@@ -18,8 +18,9 @@ class DasymetryDisaggregate:
 
             Input:
             ------
-            filename: string describing parcel file name. Directory must contain
-            all relevant files.
+            filename: string describing parcel file name, including absolute
+            path to directory containing the files, if not the current working
+            directory.
 
             Output:
             -------
@@ -35,6 +36,21 @@ class DasymetryDisaggregate:
         return self.parcel_df
 
     def load_source_data(self, filename):
+        """ Method to load source data and geometry. Uses geopandas to load a
+            shapefile into a GeoDataFrame.
+
+            Input:
+            ------
+            filename: string describing parcel file name, including absolute
+            path to directory containing the files, if not the current working
+            directory.
+
+            Output:
+            -------
+            source_df: GeoDataFrame object containing parcel data and geometry.
+        """
+
+        print('Loading source data...')
         # Load data to disaggregate into all parcels.
         self.source_df = geopandas.read_file(filename)
 
@@ -44,3 +60,6 @@ class DasymetryDisaggregate:
         # Following the work of Dahal and McPhearson (in preparation)
         # If
         return None
+
+    def write_output(self, outputfilename, outputdir='output/'):
+        
