@@ -35,9 +35,11 @@ class DasymetryDisaggregate:
 
     def load_source_data(self, filename):
         # Load data to disaggregate into all parcels.
-        return None
+        self.source_df = geopandas.read_file(filename)
+
+        return self.source_df
 
     def disaggregate_data(self, parceldata, sourcedata):
         # Following the work of Dahal and McPhearson (in preparation)
-
+        # If
         return None
