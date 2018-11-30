@@ -1,4 +1,5 @@
 import geopandas
+import geopandas.geoseries
 
 # TODO: write disaggregate_data method
 # TODO: document all methods
@@ -18,9 +19,8 @@ class DasymetryDisaggregate:
 
             Input:
             ------
-            filename: string describing parcel file name, including absolute
-            path to directory containing the files, if not the current working
-            directory.
+            filename: string describing parcel file name. Directory must contain
+            all relevant files.
 
             Output:
             -------
@@ -36,31 +36,34 @@ class DasymetryDisaggregate:
         return self.parcel_df
 
     def load_source_data(self, filename):
-        """ Method to load source data and geometry. Uses geopandas to load a
-            shapefile into a GeoDataFrame.
-
-            Input:
-            ------
-            filename: string describing parcel file name, including absolute
-            path to directory containing the files, if not the current working
-            directory.
-
-            Output:
-            -------
-            source_df: GeoDataFrame object containing parcel data and geometry.
-        """
-
-        print('Loading source data...')
         # Load data to disaggregate into all parcels.
         self.source_df = geopandas.read_file(filename)
 
         return self.source_df
 
-    def disaggregate_data(self, parceldata, sourcedata, fieldnames, top_hh_size):
+    def intersect_counter(self, centroids, boundaries):   
+        # A function that will count the number of centroids that fall within the boundaries of another layer
+        boundaries["count"] = 0
+        for i in range(len(boundaries)):
+            inter_count=0
+            CD = boundaries.loc[[i]]
+            inter_count = sum(centroids.intersects(CD))
+            boundaries.loc[i,"count"] = inter_count
+        return boundaries
+    
+    def disaggregate_data(self, fieldname, top_hh_size = 2.8):
         # Following the work of Dahal and McPhearson (in preparation)
-        # 1) check if the fieldnames exist in the sourcedata
+        # 1) check if fieldname exists in the sourcedata
+        assert(fieldname in list(self.source_df)), "Error: fieldname does not exist in source data!"
+                
         # 2) create columns in parceldata with the names of fieldnames
-        # 3) are there entities from sourcedata located within entities of parcel data?
+        self.source_df[fieldname] = 0        
+        
+        # 3) are there entities from sourcedata located within entities of parcel data (MORE THAN ONE ENTITY)
+        self.source_df_centroids = self.source_df.centroid
+        self.parcel_df = intersect_counter(self.source_df_centroids, self.parcel_df)
+        
+                
         
         #### 3.1) subset lots that have sourcedata entities within
         #### 3.2) aggregate data of sourcedata within englobing lot
@@ -98,8 +101,4 @@ class DasymetryDisaggregate:
         
         # 6) go get a beer
         
-        return None
-
-    def write_output(self, outputfilename, outputdir='output/'):
-
         return None
