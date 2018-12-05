@@ -90,7 +90,6 @@ class DasymetryDisaggregate:
             boundaries.loc[i,"count"] = inter_count
 
         return boundaries
-<<<<<<< HEAD
 
     def source_aggregator (self, source_data, lots_data, fieldname):
         lots_data["total"] = 0 # initialize field where info will be aggregated
@@ -107,7 +106,6 @@ class DasymetryDisaggregate:
             lots_data.loc[index, "total"] = sum(subset[fieldname])
 
         return lots_data
-=======
     
     def source_aggregator (self, fieldname):
         source_data=self.source_df
@@ -126,7 +124,6 @@ class DasymetryDisaggregate:
             value_disaggregate = source_df.loc[index,fieldname]
             subset_lots = lots[lots.centroid.intersects(blocks)]
             res_lots = sum(subset_lots["unitsres"])
->>>>>>> 37d1df7ce8da96ff7f7d59a9761268d46abbe31c
 
     def disaggregate_data(self, fieldname, top_hh_size = 2.8):
 
@@ -169,12 +166,9 @@ class DasymetryDisaggregate:
 
         #### First we need to check whether there is one or more rows in the lots_to_aggregateblocks dataset!
         if len(lots_to_aggregateblocks) > 0:
-<<<<<<< HEAD
             self.aggregated_lots = source_aggregator(self.source_df, self.parcel_df, fieldname)
 
-=======
             self.aggregated_lots = source_aggregator(fieldname)            
->>>>>>> 37d1df7ce8da96ff7f7d59a9761268d46abbe31c
 
         #### 4) take lots_to_disaggregateblocks and run disaggregation
         
