@@ -34,6 +34,7 @@ class DasymetryDisaggregate:
         self.parcel_df = geopandas.read_file(filename)
 
         print(filename + ' loaded!')
+        self.parcel_df.columns = map(str.lower, self.parcel_df.columns)
 
         return self.parcel_df
 
@@ -55,6 +56,7 @@ class DasymetryDisaggregate:
         print('Loading source data...')
         # Load data to disaggregate into all parcels.
         self.source_df = geopandas.read_file(filename)
+        self.source_df.columns = map(str.lower, self.source_df.columns)
 
         return self.source_df
 
@@ -90,7 +92,12 @@ class DasymetryDisaggregate:
         return lots_data
     
     def source_disaggregator (self, fieldname):
-        
+        lots = self.lots_to_disaggregateblocks
+        blocks = self.source_df
+        for index in blocks.index:
+            value_disaggregate = source_df.loc[index,fieldname]
+            subset_lots = lots[lots.centroid.intersects(blocks)]
+            res_lots = sum(subset_lots["unitsres"])
             
     def disaggregate_data(self, fieldname, top_hh_size = 2.8):
         # Following the work of Dahal and McPhearson (in preparation)
