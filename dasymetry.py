@@ -106,17 +106,17 @@ class DasymetryDisaggregate:
             lots_data.loc[index, "total"] = sum(subset[fieldname])
 
         return lots_data
-    
-    def source_aggregator (self, fieldname):
+
+    def source_aggregator(self, fieldname):
         source_data=self.source_df
         lots_data=self.lots_to_aggregateblocks
         for index in lots_data.index: #### !!!! I USE INDEXES IN THE LOOP BECAUSE THEY DONT GO 1 BY 1 ANYMORE AFTER THE SUBSET !!!!
             lot = lots_data[[index]] # subsample one single lot
             subset = source_data[source_data.centroid.intersects(lot)] # subset blocks that locate within the subsampled lot
             lots_data.loc[index, fieldname] = sum(subset[fieldname]) # Sum of all the values of the fieldname written in the column of aggregated values
-            
+
         return lots_data
-    
+
     def source_disaggregator (self, fieldname):
         lots = self.lots_to_disaggregateblocks
         blocks = self.source_df
@@ -155,7 +155,7 @@ class DasymetryDisaggregate:
 
         # 3) are there entities from sourcedata located within entities of parcel data (MORE THAN ONE ENTITY)?
         self.source_df_centroids = self.source_df.centroid
-        self.parcel_df = intersect_counter(self.source_df_centroids, self.parcel_df)
+        self.parcel_df = self.intersect_counter(self.source_df_centroids, self.parcel_df)
 
         #### 3.1) subset lots that have sourcedata entities within / subset lots that have no sourcedata entities within (count <=1)
         self.lots_to_aggregateblocks = self.parcel_df[self.parcel_df["count"] > 1]
@@ -165,13 +165,13 @@ class DasymetryDisaggregate:
         #### the centroids within
 
         #### First we need to check whether there is one or more rows in the lots_to_aggregateblocks dataset!
-        if len(lots_to_aggregateblocks) > 0:
+        if len(self.lots_to_aggregateblocks) > 0:
             self.aggregated_lots = source_aggregator(self.source_df, self.parcel_df, fieldname)
 
-            self.aggregated_lots = source_aggregator(fieldname)            
+            self.aggregated_lots = source_aggregator(fieldname)
 
         #### 4) take lots_to_disaggregateblocks and run disaggregation
-        
+
         #### 4.1) Loop per sourcedata entity
         #### 4.2) Retrieve total population / number from sourcedata
         #### 4.3) Subset lots that fall within the entity
