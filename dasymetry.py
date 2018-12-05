@@ -10,6 +10,8 @@ class DasymetryDisaggregate:
 
     def __init__(self):
 
+        # Add any top-level parameters here.
+
         return None
 
     def load_parcels(self, filename):
@@ -56,11 +58,21 @@ class DasymetryDisaggregate:
 
         return self.source_df
 
-    def intersect_counter(self, centroids, boundaries):   
-        # A function that will count the number of centroids that fall within the boundaries of another layer
+    def intersect_counter(self, centroids, boundaries):
+        """ A function that will count the number of centroids that fall within
+            the boundaries of another layer.
+
+            Input:
+            ------
+            centroids (float): Centroid coordinates of each source layer to
+            disaggregate.
+
+            boundaries (polygon ??): Boundaries of the target layer.
+        """
         boundaries["count"] = 0
-        for i in range(len(boundaries)):
-            inter_count=0
+
+        for i, bound in enumerate(boundaries):
+            # inter_count=0
             CD = boundaries.loc[[i]]
             inter_count = sum(centroids.intersects(CD))
             boundaries.loc[i,"count"] = inter_count
@@ -75,15 +87,15 @@ class DasymetryDisaggregate:
             lots_data.loc[index, "total"] = sum(subset[fieldname]) # Sum of all the values of the fieldname written in the column of aggregated values
             
         return lots_data
-        
+
     def disaggregate_data(self, fieldname, top_hh_size = 2.8):
         # Following the work of Dahal and McPhearson (in preparation)
         # 1) check if fieldname exists in the sourcedata
         assert(fieldname in list(self.source_df)), "Error: fieldname does not exist in source data!"
-                
+
         # 2) create columns in parceldata with the names of fieldnames
-        self.source_df[fieldname] = 0        
-        
+        self.source_df[fieldname] = 0
+
         # 3) are there entities from sourcedata located within entities of parcel data (MORE THAN ONE ENTITY)
         self.source_df_centroids = self.source_df.centroid
         self.parcel_df = intersect_counter(self.source_df_centroids, self.parcel_df)
