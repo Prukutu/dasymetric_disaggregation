@@ -117,13 +117,35 @@ class DasymetryDisaggregate:
 
         return lots_data
 
-    def source_disaggregator (self, fieldname):
+    
+    def source_disaggregator (self, fieldname, top_hh_size):
+
         lots = self.lots_to_disaggregateblocks
         blocks = self.source_df
         for index in blocks.index:
-            value_disaggregate = source_df.loc[index,fieldname]
+            population_disaggregate = source_df.loc[index,fieldname]
             subset_lots = lots[lots.centroid.intersects(blocks)]
             res_lots = sum(subset_lots["unitsres"])
+
+            
+            if res_lots > 0:
+                
+                res_pop_ratio = population_disaggregate/res_lots
+                subset_lots_residential = subset_lots[subset_lots["unitres"]>0]
+                
+                if res_pop_ratio <= top_hh_size:
+                                       
+                    subset_lots_residential[fieldname] = res_pop_ratio * subset_lots["unitres"]
+                    lots.loc[lots.bbl.isin(subset_lots.bbl), [fieldname]] = subset_lots_residential[[fielname]]
+                    
+                else if population_disaggregate > top_hh_size:
+                    
+                    subset_lots_residential[fieldname] = res_pop_ratio * top_hh_size
+                    remaining_pop = population_disaggregate - sum(subset_lots_residential[fieldname])
+                    
+            
+            else if res_lots == 0:
+            
 
     def disaggregate_data(self, fieldname, top_hh_size = 2.8):
 
