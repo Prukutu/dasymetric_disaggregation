@@ -22,9 +22,9 @@ class DasymetryDisaggregate:
 
             Input:
             ------
-            filename (str): string describing parcel file name, including absolute
-            path to directory containing the files, if not the current working
-            directory.
+            filename (str): string describing parcel file name, including
+            absolute path to directory containing the files, if not the current
+            working directory.
 
             Output:
             -------
@@ -46,9 +46,9 @@ class DasymetryDisaggregate:
 
             Input:
             ------
-            filename (str): string describing parcel file name, including absolute
-            path to directory containing the files, if not the current working
-            directory.
+            filename (str): string describing parcel file name, including
+            absolute path to directory containing the files, if not the current
+            working directory.
 
             Output:
             -------
@@ -86,18 +86,25 @@ class DasymetryDisaggregate:
             CD = boundaries.loc[[i]]
             inter_count = sum(centroids.intersects(CD))
             boundaries.loc[i,"count"] = inter_count
-        
+
         return boundaries
-    
+
     def source_aggregator (self, source_data, lots_data, fieldname):
         lots_data["total"] = 0 # initialize field where info will be aggregated
-        for index in lots_data.index: #### !!!! I USE INDEXES IN THE LOOP BECAUSE THEY DONT GO 1 BY 1 ANYMORE AFTER THE SUBSET !!!!
+
+        # Loop through subset values indexes.
+        for index in lots_data.index:
             lot = lots_data[[index]] # subsample one single lot
-            subset = source_data[source_data.centroid.intersects(lot)] # subset blocks that locate within the subsampled lot
-            lots_data.loc[index, "total"] = sum(subset[fieldname]) # Sum of all the values of the fieldname written in the column of aggregated values
-            
+
+            # subset blocks that locate within the subsampled lot
+            subset = source_data[source_data.centroid.intersects(lot)]
+
+            # Sum of all the values of the fieldname written in the column of
+            # aggregated values
+            lots_data.loc[index, "total"] = sum(subset[fieldname])
+
         return lots_data
-        
+
     def disaggregate_data(self, fieldname, top_hh_size = 2.8):
 
         """ Disaggregate fieldname from source_df into parcels.
@@ -117,7 +124,7 @@ class DasymetryDisaggregate:
             parcel_df (GeoDataFrame): GeoDataFrame with source data
             disaggregated to each parcel.
         """
-        
+
         # Following the work of Dahal and McPhearson (in preparation)
         # 1) check if fieldname exists in the sourcedata
         msg = 'Error: fieldname does not exist in source data!'
@@ -133,13 +140,13 @@ class DasymetryDisaggregate:
         #### 3.1) subset lots that have sourcedata entities within / subset lots that have no sourcedata entities within (count <=1)
         self.lots_to_aggregateblocks = self.parcel_df[self.parcel_df["count"] > 1]
         self.lots_to_disaggregateblocks = self.parcel_df[self.parcel_df["count"] <= 1]
-        
-        #### 3.2) aggregate data of sourcedata within lots_to_aggregateblocks --> loop that goes lot by lot and aggregates the info of 
+
+        #### 3.2) aggregate data of sourcedata within lots_to_aggregateblocks --> loop that goes lot by lot and aggregates the info of
         #### the centroids within
-        
+
         #### First we need to check whether there is one or more rows in the lots_to_aggregateblocks dataset!
         if len(lots_to_aggregateblocks) > 0:
-            self.aggregated_lots = source_aggregator(self.source_df, self.parcel_df, fieldname)            
+            self.aggregated_lots = source_aggregator(self.source_df, self.parcel_df, fieldname)
 
 
         #### 4) take lots_to_disaggregateblocks and run disaggregation
@@ -188,8 +195,8 @@ class DasymetryDisaggregate:
 
             drop_geometry (bool): Whether to drop geometry column in output (default False)
 
-            driver (str): Supported file driver. Check fiona.supported_drivers for
-            compatibility.
+            driver (str): Supported file driver. Check fiona.supported_drivers
+            for compatibility.
 
             Output:
             -------
