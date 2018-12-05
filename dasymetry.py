@@ -4,6 +4,7 @@ import geopandas
 # TODO: document all methods
 
 class DasymetryDisaggregate:
+
     """ Class collecting tools to disaggregate socio-demographic data into
         discrete parcels.
     """
@@ -15,6 +16,7 @@ class DasymetryDisaggregate:
         return None
 
     def load_parcels(self, filename):
+
         """ Method to load parcel geometry. Uses geopandas to load a shapefile
             into a GeoDataFrame.
 
@@ -39,6 +41,7 @@ class DasymetryDisaggregate:
         return self.parcel_df
 
     def load_source_data(self, filename):
+
         """ Method to load source data and geometry. Uses geopandas to load a
             shapefile into a GeoDataFrame.
 
@@ -61,6 +64,7 @@ class DasymetryDisaggregate:
         return self.source_df
 
     def intersect_counter(self, centroids, boundaries):
+
         """ A function that will count the number of centroids that fall within
             the boundaries of another layer.
 
@@ -69,8 +73,14 @@ class DasymetryDisaggregate:
             centroids (float): Centroid coordinates of each source layer to
             disaggregate.
 
-            boundaries (polygon ??): Boundaries of the target layer.
+            boundaries (GeoDataFrame ?): Boundaries of the target layer.
+
+            Output:
+            -------
+            boundaries (GeoDataFrame): Boundaries GeoDataFrame containing number
+            of intersecting source centroids.
         """
+
         boundaries["count"] = 0
 
         for i, bound in enumerate(boundaries):
@@ -98,11 +108,31 @@ class DasymetryDisaggregate:
             value_disaggregate = source_df.loc[index,fieldname]
             subset_lots = lots[lots.centroid.intersects(blocks)]
             res_lots = sum(subset_lots["unitsres"])
-            
+
     def disaggregate_data(self, fieldname, top_hh_size = 2.8):
+
+        """ Disaggregate fieldname from source_df into parcels.
+
+            Input:
+            ------
+            fieldname (str): Name of field to be disaggregated. Must exist in
+            source_df
+
+            kwargs:
+            -------
+            top_hh_size (float): maximum number of people to allocate to a
+            residential unit.
+
+            Output:
+            -------
+            parcel_df (GeoDataFrame): GeoDataFrame with source data
+            disaggregated to each parcel.
+        """
+        
         # Following the work of Dahal and McPhearson (in preparation)
         # 1) check if fieldname exists in the sourcedata
-        assert(fieldname in list(self.source_df)), "Error: fieldname does not exist in source data!"
+        msg = 'Error: fieldname does not exist in source data!'
+        assert fieldname in self.source_df.columns, msg
 
         # 2) create columns in parceldata with the names of fieldnames
         self.parcel_df[fieldname] = 0
