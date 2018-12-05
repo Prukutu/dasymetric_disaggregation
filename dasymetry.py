@@ -97,7 +97,7 @@ class DasymetryDisaggregate:
             lots_data.loc[index, "total"] = sum(subset[fieldname]) # Sum of all the values of the fieldname written in the column of aggregated values
             
         return lots_data
-
+        
     def disaggregate_data(self, fieldname, top_hh_size = 2.8):
 
         """ Disaggregate fieldname from source_df into parcels.
