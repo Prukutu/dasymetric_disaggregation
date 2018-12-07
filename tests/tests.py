@@ -9,11 +9,9 @@ import dasymetry
 
 dasy = dasymetry.DasymetryDisaggregate()
 datadir = '/home/luis/github/dasymetric_disaggregation/testdata/'
+
 source_df = dasy.load_source_data(datadir + 'manhattan_test_source.shp')
 parcel_df = dasy.load_parcels(datadir + 'manhattan_test.shp')
-
-# Make projections consistent
-parcel_df = parcel_df.to_crs(source_df.crs)
 
 dasy.disaggregate_data('pop10')
 
@@ -21,6 +19,10 @@ dasy.disaggregate_data('pop10')
 class TestDataLoadMethods(unittest.TestCase):
 
     def test_parcel_df_type(self):
+
+        self.assertIs(type(parcel_df), geopandas.GeoDataFrame)
+
+    def test_source_df_type(self):
         self.assertIs(type(parcel_df), geopandas.GeoDataFrame)
 
     def test_source_df_type(self):
