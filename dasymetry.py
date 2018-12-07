@@ -91,22 +91,6 @@ class DasymetryDisaggregate:
 
         return boundaries
 
-    def source_aggregator (self, source_data, lots_data, fieldname):
-        lots_data["total"] = 0 # initialize field where info will be aggregated
-
-        # Loop through subset values indexes.
-        for index in lots_data.index:
-            lot = lots_data[[index]] # subsample one single lot
-
-            # subset blocks that locate within the subsampled lot
-            subset = source_data[source_data.centroid.intersects(lot)]
-
-            # Sum of all the values of the fieldname written in the column of
-            # aggregated values
-            lots_data.loc[index, "total"] = sum(subset[fieldname])
-
-        return lots_data
-
     def source_aggregator(self, fieldname):
         source_data=self.source_df
         lots_data=self.lots_to_aggregateblocks
@@ -117,8 +101,7 @@ class DasymetryDisaggregate:
 
         return lots_data
 
-    
-    def source_disaggregator (self, fieldname, top_hh_size):
+  def source_disaggregator (self, fieldname, top_hh_size):
 
         lots = self.lots_to_disaggregateblocks
         blocks = self.source_df
@@ -187,8 +170,8 @@ class DasymetryDisaggregate:
         #### the centroids within
 
         #### First we need to check whether there is one or more rows in the lots_to_aggregateblocks dataset!
+
         if len(self.lots_to_aggregateblocks) > 0:
-            self.aggregated_lots = source_aggregator(self.source_df, self.parcel_df, fieldname)
 
             self.aggregated_lots = source_aggregator(fieldname)
 
