@@ -91,7 +91,7 @@ class DasymetryDisaggregate:
 
         return boundaries
 
-    def source_aggregator (self, fieldname):
+    def source_aggregator(self, fieldname):
         source_data=self.source_df
         lots_data=self.lots_to_aggregateblocks
         for index in lots_data.index: #### !!!! I USE INDEXES IN THE LOOP BECAUSE THEY DONT GO 1 BY 1 ANYMORE AFTER THE SUBSET !!!!
@@ -101,13 +101,34 @@ class DasymetryDisaggregate:
 
         return lots_data
 
-    def source_disaggregator (self, fieldname):
+  def source_disaggregator (self, fieldname, top_hh_size):
+
         lots = self.lots_to_disaggregateblocks
         blocks = self.source_df
         for index in blocks.index:
-            value_disaggregate = source_df.loc[index,fieldname]
+            population_disaggregate = source_df.loc[index,fieldname]
             subset_lots = lots[lots.centroid.intersects(blocks)]
             res_lots = sum(subset_lots["unitsres"])
+
+            
+            if res_lots > 0:
+                
+                res_pop_ratio = population_disaggregate/res_lots
+                subset_lots_residential = subset_lots[subset_lots["unitres"]>0]
+                
+                if res_pop_ratio <= top_hh_size:
+                                       
+                    subset_lots_residential[fieldname] = res_pop_ratio * subset_lots["unitres"]
+                    lots.loc[lots.bbl.isin(subset_lots.bbl), [fieldname]] = subset_lots_residential[[fielname]]
+                    
+                else if population_disaggregate > top_hh_size:
+                    
+                    subset_lots_residential[fieldname] = res_pop_ratio * top_hh_size
+                    remaining_pop = population_disaggregate - sum(subset_lots_residential[fieldname])
+                    
+            
+            else if res_lots == 0:
+            
 
     def disaggregate_data(self, fieldname, top_hh_size = 2.8):
 
@@ -139,7 +160,7 @@ class DasymetryDisaggregate:
 
         # 3) are there entities from sourcedata located within entities of parcel data (MORE THAN ONE ENTITY)?
         self.source_df_centroids = self.source_df.centroid
-        self.parcel_df = intersect_counter(self.source_df_centroids, self.parcel_df)
+        self.parcel_df = self.intersect_counter(self.source_df_centroids, self.parcel_df)
 
         #### 3.1) subset lots that have sourcedata entities within / subset lots that have no sourcedata entities within (count <=1)
         self.lots_to_aggregateblocks = self.parcel_df[self.parcel_df["count"] > 1]
@@ -149,7 +170,9 @@ class DasymetryDisaggregate:
         #### the centroids within
 
         #### First we need to check whether there is one or more rows in the lots_to_aggregateblocks dataset!
-        if len(lots_to_aggregateblocks) > 0:
+
+        if len(self.lots_to_aggregateblocks) > 0:
+
             self.aggregated_lots = source_aggregator(fieldname)
 
         #### 4) take lots_to_disaggregateblocks and run disaggregation
