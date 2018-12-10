@@ -134,24 +134,22 @@ class DasymetryDisaggregate:
                 subset_lots_residential = subset_lots[subset_lots["unitres"]>0]
                 subset_lots_non_residential = subset_lots[subset_lots["unitres"]==0]
                 
+                subset_lots_residential["res_ratio"] = subset_lots_residential["unitres"]/sum(subset_lots_residential["unitres"])
+                
                 subset_lots_misc = subset_lots_non_residential[(subset_lots_non_residential["bldgclass"].str.contains("^I")) | (subset_lots_non_residential["bldgclass"].str.contains("^M")) | (subset_lots_non_residential["bldgclass"].str.contains("^N")) | (subset_lots_non_residential["bldgclass"].str.contains("Y3")) | (subset_lots_non_residential["bldgclass"].str.contains("^W"))]
                 subset_lots__parks = subset_lots_non_residential[subset_lots_non_residential["landuse"]=="09"]
                 
-                if res_pop_ratio <= top_hh_size:
-                    
-                    subset_lots_residential["res_ratio"] = subset_lots_residential["unitres"]/sum(subset_lots_residential["unitres"])
-                                      
-                    subset_lots_residential[fieldname] = subset_lots_residential["res_ratio"] * population_disaggregate
-                    
+                if res_pop_ratio <= top_hh_size:                   
+                                    
+                    subset_lots_residential[fieldname] = subset_lots_residential["res_ratio"] * population_disaggregate                   
                     lots.loc[lots.bbl.isin(subset_lots.bbl), [fieldname]] = subset_lots_residential[[fielname]]
                     
                 elif res_pop_ratio > top_hh_size:
                     
                     # if only resunits in block
-                    if len(subset_lots_residential) == len(subset_lots):
-                        
-                        subset_lots_residential["res_ratio"] = subset_lots_residential["unitres"]/sum(subset_lots_residential["unitres"])                                     
-                        subset_lots_residential[fieldname] = subset_lots_residential["res_ratio"] * population_disaggregate]
+                    if len(subset_lots_residential) == len(subset_lots) | len(subset_lots__parks) == 0 & len(subset_lots_misc) == 0:
+                                                             
+                        subset_lots_residential[fieldname] = subset_lots_residential["res_ratio"] * population_disaggregate
                     
                         lots.loc[lots.bbl.isin(subset_lots_residential.bbl), [fieldname]] = subset_lots_residential[[fielname]]
                     
@@ -162,19 +160,22 @@ class DasymetryDisaggregate:
                         lots.loc[lots.bbl.isin(subset_lots_residential.bbl), [fieldname]] = subset_lots_residential[[fielname]]
                                                                           
                         remaining_pop = population_disaggregate - sum(subset_lots_residential[fieldname])
-                        
+                                                
                         if len(subset_lots_misc) > 0:
                             
-                            if len(subset_lots__parks) > 0:
+                            pop_den = float(remaining_pop)/sum(subset_lots_misc["lotarea"])
+                            total_misc_area = sum(subset_lots_misc["lotarea"])
+                            subset_lots_misc["area_ratio"] = subset_lots_misc["lotarea"]/total_misc_area
                             
-                                pop_den = float(remaining_pop)/sum(subset_lots_misc["lotarea"])
-
+                            # residential + miscelaneous + parks
+                            if len(subset_lots__parks) > 0:                            
+                                
+                                total_parks_area = sum(subset_lots__parks["lotarea"])
+                                subset_lots__parks["area_ratio"] = subset_lots__parks["lotarea"]/total_parks_area
+                                
                                 if pop_den <= top_den_allowed:
-
-                                    total_misc_area = sum(subset_lots_misc["lotarea"])
-                                    subset_lots_misc["area_ratio"] = subset_lots_misc["lotarea"]/total_misc_area
+                                    
                                     subset_lots_misc[fieldname] = subset_lots_misc["area_ratio"]*remaining_pop
-
                                     lots.loc[lots.bbl.isin(subset_lots_misc.bbl), [fieldname]] = subset_lots_misc[[fielname]]
 
                                 elif pop_den > top_den_allowed:
@@ -188,8 +189,6 @@ class DasymetryDisaggregate:
                                     
                                     if pop_den_parks <=5:
                                         
-                                    total_parks_area = sum(subset_lots__parks["lotarea"])
-                                    subset_lots__parks["area_ratio"] = subset_lots__parks["lotarea"]/total_parks_area
                                     subset_lots__parks[fieldname] = subset_lots__parks["area_ratio"]*remaining_pop
 
                                     lots.loc[lots.bbl.isin(subset_lots__parks.bbl), [fieldname]] = subset_lots__parks[[fielname]]
@@ -206,18 +205,131 @@ class DasymetryDisaggregate:
                                             subset_lots_residential[fieldname] = subset_lots_residential[fieldname] + (subset_lots_residential["res_ratio"]*remaining_pop)
                                             lots.loc[lots.bbl.isin(subset_lots_residential.bbl), [fieldname]] = subset_lots_residential[[fielname]]
                                             
-                                    
+                            # residential + miscelaneous        
                             elif len(subset_lots_parks) == 0:
+                                
+                                pop_den = float(remaining_pop)/sum(subset_lots_misc["lotarea"])
+
+                                if pop_den <= top_den_allowed:
+
+                                    subset_lots_misc[fieldname] = subset_lots_misc["area_ratio"]*remaining_pop
+
+                                    lots.loc[lots.bbl.isin(subset_lots_misc.bbl), [fieldname]] = subset_lots_misc[[fielname]]
+                                    
+                                elif pop_den > top_den_allowed:
+                                    
+                                    subset_lots_misc[fieldname] = top_den_allowed*subset_lots_misc["lotarea"]
+                                    lots.loc[lots.bbl.isin(subset_lots_misc.bbl), [fieldname]] = subset_lots_misc[[fielname]]
+                                    
+                                    remaining_pop = remaining_pop - sum(subset_lots_misc[fieldname])
+                                    
+                                    if remaining_pop > 0:
+                                            
+                                        subset_lots_residential[fieldname] = subset_lots_residential[fieldname] + (subset_lots_residential["res_ratio"]*remaining_pop)
+                                        lots.loc[lots.bbl.isin(subset_lots_residential.bbl), [fieldname]] = subset_lots_residential[[fielname]]
                             
                         if len (subset_lots_misc) == 0:
-                                                                                   
-                            elif len(subset_lots_parks) > 0: 
                             
-                            pop_den =
+                            # residential + parks
+                            if len(subset_lots_parks) > 0: 
+
+                                total_parks_area = sum(subset_lots__parks["lotarea"])
+                                subset_lots__parks["area_ratio"] = subset_lots__parks["lotarea"]/total_parks_area                                
+                                
+                            pop_den_parks = float(remaining_pop)/sum(subset_lots_parks["lotarea"])
+                                    
+                                if pop_den_parks <=5:
+                                        
+                                    subset_lots__parks[fieldname] = subset_lots__parks["area_ratio"]*remaining_pop                            
+
+                                    lots.loc[lots.bbl.isin(subset_lots__parks.bbl), [fieldname]] = subset_lots__parks[[fielname]]
+                                
+                                elif pop_den_parks > 5: 
+                                    
+                                    subset_lots__parks[fieldname] = 5*subset_lots__parks["lotarea"]
+                                    lots.loc[lots.bbl.isin(subset_lots__parks.bbl), [fieldname]] = subset_lots__parks[[fielname]]
+                                    
+                                    remaining_pop = remaining_pop - sum(subset_lots__parks[fieldname])
+                                    
+                                    if remaining_pop > 0:
+                                        
+                                        subset_lots_residential[fieldname] = subset_lots_residential[fieldname] + (subset_lots_residential["res_ratio"]*remaining_pop)
+                                        lots.loc[lots.bbl.isin(subset_lots_residential.bbl), [fieldname]] = subset_lots_residential[[fielname]]
                             
-                            if len(subset_lots__parks) == 0: 
+                                        
             elif res_units == 0:
             
+                subset_lots_non_residential = subset_lots[subset_lots["unitres"]==0]
+                
+                subset_lots_misc = subset_lots_non_residential[(subset_lots_non_residential["bldgclass"].str.contains("^I")) | (subset_lots_non_residential["bldgclass"].str.contains("^M")) | (subset_lots_non_residential["bldgclass"].str.contains("^N")) | (subset_lots_non_residential["bldgclass"].str.contains("Y3")) | (subset_lots_non_residential["bldgclass"].str.contains("^W"))]
+                subset_lots__parks = subset_lots_non_residential[subset_lots_non_residential["landuse"]=="09"]
+                
+                if len(subset_lots_misc) > 0 & len(subset_lots_parks) > 0:
+
+                    pop_den = float(population_disaggregate)/sum(subset_lots_misc["lotarea"])
+                    total_misc_area = sum(subset_lots_misc["lotarea"])
+                    total_parks_area = sum(subset_lots_parks["lotarea"])
+                    subset_lots_misc["area_ratio"] = subset_lots_misc["lotarea"]/total_misc_area
+                    subset_lots__parks["area_ratio"] = subset_lots__parks["lotarea"]/total_parks_area
+                    
+                        if pop_den <= top_den_allowed:
+                            
+                            total_misc_area = sum(subset_lots_misc["lotarea"])
+                            subset_lots_misc[fieldname] = subset_lots_misc["area_ratio"]*population_disaggregate
+
+                            lots.loc[lots.bbl.isin(subset_lots_misc.bbl), [fieldname]] = subset_lots_misc[[fielname]]
+
+                        elif pop_den > top_den_allowed:
+                                    
+                            subset_lots_misc[fieldname] = top_den_allowed*subset_lots_misc["lotarea"]
+                            lots.loc[lots.bbl.isin(subset_lots_misc.bbl), [fieldname]] = subset_lots_misc[[fielname]]
+                                    
+                            remaining_pop = population_disaggregate - sum(subset_lots_misc[fieldname])
+                                    
+                            pop_den_parks = float(remaining_pop)/sum(subset_lots__parks["lotarea"])
+                                    
+                            if pop_den_parks <=5:
+                                        
+                                total_parks_area = sum(subset_lots__parks["lotarea"])
+                                subset_lots__parks[fieldname] = subset_lots__parks["area_ratio"]*remaining_pop
+
+                                lots.loc[lots.bbl.isin(subset_lots__parks.bbl), [fieldname]] = subset_lots__parks[[fielname]]
+                                
+                            elif pop_den_parks > 5: 
+                                        
+                                subset_lots__parks[fieldname] = 5*subset_lots__parks["lotarea"]
+                                lots.loc[lots.bbl.isin(subset_lots__parks.bbl), [fieldname]] = subset_lots__parks[[fielname]]
+                                        
+                                remaining_pop = remaining_pop - sum(subset_lots__parks[fieldname])
+                                        
+                                if remaining_pop > 0:
+                                                                        
+                                    subset_lots_misc[fieldname] = subset_lots_misc[fieldname] + subset_lots_misc["area_ratio"]*remaining_pop
+
+                                    lots.loc[lots.bbl.isin(subset_lots_misc.bbl), [fieldname]] = subset_lots_misc[[fielname]]
+                                    
+                if len(subset_lots_misc) > 0 & len(subset_lots_parks) == 0:
+                    
+                    total_misc_area = sum(subset_lots_misc["lotarea"])
+                    subset_lots_misc["area_ratio"] = subset_lots_misc["lotarea"]/total_misc_area
+                    
+                    pop_den = float(population_disaggregate)/sum(subset_lots_misc["lotarea"])
+
+                    if pop_den <= top_den_allowed:
+
+                        subset_lots_misc[fieldname] = subset_lots_misc["area_ratio"]*population_disaggregate
+
+                        lots.loc[lots.bbl.isin(subset_lots_misc.bbl), [fieldname]] = subset_lots_misc[[fielname]]
+                                    
+                    elif pop_den > top_den_allowed:
+                                    
+                        subset_lots_misc[fieldname] = top_den_allowed*subset_lots_misc["lotarea"]
+                        lots.loc[lots.bbl.isin(subset_lots_misc.bbl), [fieldname]] = subset_lots_misc[[fielname]]
+                                    
+                        remaining_pop = population_disaggregate - sum(subset_lots_misc[fieldname])
+                                    
+                        if remaining_pop > 0:                    
+                                    
 
     def disaggregate_data(self, fieldname, top_hh_size = 2.8, top_den = 55):
 
