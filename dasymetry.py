@@ -123,7 +123,7 @@ class DasymetryDisaggregate:
         lots = self.lots_to_disaggregateblocks
         blocks = self.source_df
         for index in blocks.index:
-            population_disaggregate = source_df.loc[index,fieldname]
+            population_disaggregate = blocks.loc[index,fieldname]
             subset_lots = lots[lots.centroid.intersects(blocks)]
             res_units = sum(subset_lots["unitsres"])
             
