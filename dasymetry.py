@@ -134,7 +134,7 @@ class DasymetryDisaggregate:
                 subset_lots_residential = subset_lots[subset_lots["unitres"]>0]
                 subset_lots_non_residential = subset_lots[subset_lots["unitres"]==0]
                 
-                subset_lots_residential["res_ratio"] = subset_lots_residential["unitres"]/sum(subset_lots_residential["unitres"])
+                subset_lots_residential["res_ratio"] = subset_lots_residential["unitres"]/res_units
                 
                 subset_lots_misc = subset_lots_non_residential[(subset_lots_non_residential["bldgclass"].str.contains("^I")) | (subset_lots_non_residential["bldgclass"].str.contains("^M")) | (subset_lots_non_residential["bldgclass"].str.contains("^N")) | (subset_lots_non_residential["bldgclass"].str.contains("Y3")) | (subset_lots_non_residential["bldgclass"].str.contains("^W"))]
                 subset_lots__parks = subset_lots_non_residential[subset_lots_non_residential["landuse"]=="09"]
