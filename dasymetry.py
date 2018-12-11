@@ -15,7 +15,7 @@ class DasymetryDisaggregate:
 
         return None
 
-    def load_parcels(self, filename):
+    def load_parcels(self, filename, fid='bbl'):
 
         """ Method to load parcel geometry. Uses geopandas to load a shapefile
             into a GeoDataFrame.
@@ -25,6 +25,9 @@ class DasymetryDisaggregate:
             filename (str): string describing parcel file name, including
             absolute path to directory containing the files, if not the current
             working directory.
+
+            fid (str): Name of the column name that identifies each parcel.
+            Default bbl from NYC MapPLUTO.
 
             Output:
             -------
@@ -36,11 +39,16 @@ class DasymetryDisaggregate:
         self.parcel_df = geopandas.read_file(filename)
 
         print(filename + ' loaded!')
+
+        # Make all column names lowercase
         self.parcel_df.columns = map(str.lower, self.parcel_df.columns)
+
+        # Make fid into the GeoDataFrame index.
+        self.parcel_df.set_index(fid, inplace=True)
 
         return self.parcel_df
 
-    def load_source_data(self, filename):
+    def load_source_data(self, filename, fid='BLOCKID10'):
 
         """ Method to load source data and geometry. Uses geopandas to load a
             shapefile into a GeoDataFrame.
@@ -50,6 +58,9 @@ class DasymetryDisaggregate:
             filename (str): string describing parcel file name, including
             absolute path to directory containing the files, if not the current
             working directory.
+
+            fid (str): Name of the column name that identifies each parcel.
+            Default BLOCKID10, from US Census.
 
             Output:
             -------
@@ -61,12 +72,16 @@ class DasymetryDisaggregate:
         self.source_df = geopandas.read_file(filename)
         self.source_df.columns = map(str.lower, self.source_df.columns)
 
+        # Make fid into the GeoDataFrame index.
+        self.source_df.set_index(fid, inplace=True)
+
         return self.source_df
 
     def generate_intersects(self):
         """ Create two GeoDataFrames containing of (a) parcels whose centroids
             lie within each census block, and (b) census blocks whose centroids
             lie within each parcel.
+
         """
 
         # Create copies of the source shapefiles, substituting their geometry
@@ -98,134 +113,123 @@ class DasymetryDisaggregate:
         self.parcels_in_blocks = find_intersects(self.source_df,
                                                  parcel_centroid)
 
-    def intersect_counter(self, centroids, boundaries):
-
-        """ A function that will count the number of centroids that lie within
-            another layer.
+    def source_aggregator(self, fieldname):
+        """ Method that takes parcels that contain more than one source block,
+            aggregates the data, then assign its sum to the parcel.
 
             Input:
-            ------
-            centroids (float): Centroid coordinates of each source layer to
-            disaggregate.
-
-            boundaries (GeoDataFrame ?): Boundaries of the target layer.
+            ======
+            self.source_df:
+            self.parcels_df:
+            self.blocks_in_parcels
 
             Output:
-            -------
-            boundaries (GeoDataFrame): Boundaries GeoDataFrame containing number
-            of intersecting source centroids.
+            =======
+            Writes the aggregated block data to parcels_df
         """
-
-        boundaries["count"] = 0
-
-        for i, bound in enumerate(boundaries):
-            CD = boundaries.loc[[i]]
-            inter_count = sum(centroids.intersects(CD))
-            boundaries.loc[i,"count"] = inter_count
-
-        return boundaries
-
-    def source_aggregator(self, fieldname):
         source_data=self.source_df
-        lots_data=self.lots_to_aggregateblocks
-        for index in lots_data.index: #### !!!! I USE INDEXES IN THE LOOP BECAUSE THEY DONT GO 1 BY 1 ANYMORE AFTER THE SUBSET !!!!
-            lot = lots_data[[index]] # subsample one single lot
-            subset = source_data[source_data.centroid.intersects(lot)] # subset blocks that locate within the subsampled lot
-            lots_data.loc[index, fieldname] = sum(subset[fieldname]) # Sum of all the values of the fieldname written in the column of aggregated values
+        lots_data=self.blocks_in_parcels
 
-        return lots_data
+        # Group lots_data by lot index, then sum all values under fieldname
 
-    
+        data_sums = lots_data.groupby('BBL').sum()[fieldname]
+        lotnames = data_sums['BBL'].unique()
+
+        # Write the sums to their respective lots in parcel_df
+        self.parcels_df.loc[data_sums.index, fieldname] = data_sums.values
+
+        return None
+
     def source_disaggregator(self, fieldname, top_hh_size, top_den_allowed):
-        
-        lots = self.lots_to_disaggregateblocks
+
+        lots = self.parcels_in_blocks
         blocks = self.source_df
         for index in blocks.index:
             population_disaggregate = blocks.loc[index,fieldname]
             subset_lots = lots[lots.centroid.intersects(blocks)]
             res_units = sum(subset_lots["unitsres"])
-            
+
             if res_units > 0:
-                
+
                 res_pop_ratio = population_disaggregate/res_units
-                
+
                 subset_lots_residential = subset_lots[subset_lots["unitres"]>0]
                 subset_lots_non_residential = subset_lots[subset_lots["unitres"]==0]
-                
+
                 subset_lots_residential["res_ratio"] = subset_lots_residential["unitres"]/res_units
-                
+
                 subset_lots_misc = subset_lots_non_residential[(subset_lots_non_residential["bldgclass"].str.contains("^I")) | (subset_lots_non_residential["bldgclass"].str.contains("^M")) | (subset_lots_non_residential["bldgclass"].str.contains("^N")) | (subset_lots_non_residential["bldgclass"].str.contains("Y3")) | (subset_lots_non_residential["bldgclass"].str.contains("^W"))]
                 subset_lots__parks = subset_lots_non_residential[subset_lots_non_residential["landuse"]=="09"]
-                
-                if res_pop_ratio <= top_hh_size:                   
-                                    
-                    subset_lots_residential[fieldname] = subset_lots_residential["res_ratio"] * population_disaggregate                   
+
+                if res_pop_ratio <= top_hh_size:
+
+                    subset_lots_residential[fieldname] = subset_lots_residential["res_ratio"] * population_disaggregate
                     lots.loc[lots.bbl.isin(subset_lots.bbl), [fieldname]] = subset_lots_residential[[fielname]]
-                    
+
                 elif res_pop_ratio > top_hh_size:
-                    
+
                     # if only resunits in block
                     if len(subset_lots_residential) == len(subset_lots) | len(subset_lots__parks) == 0 & len(subset_lots_misc) == 0:
-                                                             
+
                         subset_lots_residential[fieldname] = subset_lots_residential["res_ratio"] * population_disaggregate
-                    
+
                         lots.loc[lots.bbl.isin(subset_lots_residential.bbl), [fieldname]] = subset_lots_residential[[fielname]]
-                    
+
                     # more than residential
                     elif len(subset_lots_residential) < len(subset_lots):
-                        
+
                         subset_lots_residential[fieldname] = subset_lots_residential["unitsres"] * top_hh_size
                         lots.loc[lots.bbl.isin(subset_lots_residential.bbl), [fieldname]] = subset_lots_residential[[fielname]]
-                                                                          
+
                         remaining_pop = population_disaggregate - sum(subset_lots_residential[fieldname])
-                                                
+
                         if len(subset_lots_misc) > 0:
-                            
+
                             pop_den = float(remaining_pop)/sum(subset_lots_misc["lotarea"])
                             total_misc_area = sum(subset_lots_misc["lotarea"])
                             subset_lots_misc["area_ratio"] = subset_lots_misc["lotarea"]/total_misc_area
-                            
+
                             # residential + miscelaneous + parks
-                            if len(subset_lots__parks) > 0:                            
-                                
+                            if len(subset_lots__parks) > 0:
+
                                 total_parks_area = sum(subset_lots__parks["lotarea"])
                                 subset_lots__parks["area_ratio"] = subset_lots__parks["lotarea"]/total_parks_area
-                                
+
                                 if pop_den <= top_den_allowed:
-                                    
+
                                     subset_lots_misc[fieldname] = subset_lots_misc["area_ratio"]*remaining_pop
                                     lots.loc[lots.bbl.isin(subset_lots_misc.bbl), [fieldname]] = subset_lots_misc[[fielname]]
 
                                 elif pop_den > top_den_allowed:
-                                    
+
                                     subset_lots_misc[fieldname] = top_den_allowed*subset_lots_misc["lotarea"]
                                     lots.loc[lots.bbl.isin(subset_lots_misc.bbl), [fieldname]] = subset_lots_misc[[fielname]]
-                                    
+
                                     remaining_pop = remaining_pop - sum(subset_lots_misc[fieldname])
-                                    
+
                                     pop_den_parks = float(remaining_pop)/sum(subset_lots__parks["lotarea"])
-                                    
+
                                     if pop_den_parks <=5:
-                                        
+
                                     subset_lots__parks[fieldname] = subset_lots__parks["area_ratio"]*remaining_pop
 
                                     lots.loc[lots.bbl.isin(subset_lots__parks.bbl), [fieldname]] = subset_lots__parks[[fielname]]
-                                
-                                    elif pop_den_parks > 5: 
-                                        
+
+                                    elif pop_den_parks > 5:
+
                                         subset_lots__parks[fieldname] = 5*subset_lots__parks["lotarea"]
                                         lots.loc[lots.bbl.isin(subset_lots__parks.bbl), [fieldname]] = subset_lots__parks[[fielname]]
-                                        
+
                                         remaining_pop = remaining_pop - sum(subset_lots__parks[fieldname])
-                                        
+
                                         if remaining_pop > 0:
-                                            
+
                                             subset_lots_residential[fieldname] = subset_lots_residential[fieldname] + (subset_lots_residential["res_ratio"]*remaining_pop)
                                             lots.loc[lots.bbl.isin(subset_lots_residential.bbl), [fieldname]] = subset_lots_residential[[fielname]]
-                                            
-                            # residential + miscelaneous        
+
+                            # residential + miscelaneous
                             elif len(subset_lots_parks) == 0:
-                                
+
                                 pop_den = float(remaining_pop)/sum(subset_lots_misc["lotarea"])
 
                                 if pop_den <= top_den_allowed:
@@ -233,55 +237,55 @@ class DasymetryDisaggregate:
                                     subset_lots_misc[fieldname] = subset_lots_misc["area_ratio"]*remaining_pop
 
                                     lots.loc[lots.bbl.isin(subset_lots_misc.bbl), [fieldname]] = subset_lots_misc[[fielname]]
-                                    
+
                                 elif pop_den > top_den_allowed:
-                                    
+
                                     subset_lots_misc[fieldname] = top_den_allowed*subset_lots_misc["lotarea"]
                                     lots.loc[lots.bbl.isin(subset_lots_misc.bbl), [fieldname]] = subset_lots_misc[[fielname]]
-                                    
+
                                     remaining_pop = remaining_pop - sum(subset_lots_misc[fieldname])
-                                    
+
                                     if remaining_pop > 0:
-                                            
+
                                         subset_lots_residential[fieldname] = subset_lots_residential[fieldname] + (subset_lots_residential["res_ratio"]*remaining_pop)
                                         lots.loc[lots.bbl.isin(subset_lots_residential.bbl), [fieldname]] = subset_lots_residential[[fielname]]
-                            
+
                         if len (subset_lots_misc) == 0:
-                            
+
                             # residential + parks
-                            if len(subset_lots_parks) > 0: 
+                            if len(subset_lots_parks) > 0:
 
                                 total_parks_area = sum(subset_lots__parks["lotarea"])
-                                subset_lots__parks["area_ratio"] = subset_lots__parks["lotarea"]/total_parks_area                                
-                                
+                                subset_lots__parks["area_ratio"] = subset_lots__parks["lotarea"]/total_parks_area
+
                             pop_den_parks = float(remaining_pop)/sum(subset_lots_parks["lotarea"])
-                                    
+
                                 if pop_den_parks <=5:
-                                        
-                                    subset_lots__parks[fieldname] = subset_lots__parks["area_ratio"]*remaining_pop                            
+
+                                    subset_lots__parks[fieldname] = subset_lots__parks["area_ratio"]*remaining_pop
 
                                     lots.loc[lots.bbl.isin(subset_lots__parks.bbl), [fieldname]] = subset_lots__parks[[fielname]]
-                                
-                                elif pop_den_parks > 5: 
-                                    
+
+                                elif pop_den_parks > 5:
+
                                     subset_lots__parks[fieldname] = 5*subset_lots__parks["lotarea"]
                                     lots.loc[lots.bbl.isin(subset_lots__parks.bbl), [fieldname]] = subset_lots__parks[[fielname]]
-                                    
+
                                     remaining_pop = remaining_pop - sum(subset_lots__parks[fieldname])
-                                    
+
                                     if remaining_pop > 0:
-                                        
+
                                         subset_lots_residential[fieldname] = subset_lots_residential[fieldname] + (subset_lots_residential["res_ratio"]*remaining_pop)
                                         lots.loc[lots.bbl.isin(subset_lots_residential.bbl), [fieldname]] = subset_lots_residential[[fielname]]
-                            
-                                        
+
+
             elif res_units == 0:
-            
+
                 subset_lots_non_residential = subset_lots[subset_lots["unitres"]==0]
-                
+
                 subset_lots_misc = subset_lots_non_residential[(subset_lots_non_residential["bldgclass"].str.contains("^I")) | (subset_lots_non_residential["bldgclass"].str.contains("^M")) | (subset_lots_non_residential["bldgclass"].str.contains("^N")) | (subset_lots_non_residential["bldgclass"].str.contains("Y3")) | (subset_lots_non_residential["bldgclass"].str.contains("^W"))]
                 subset_lots__parks = subset_lots_non_residential[subset_lots_non_residential["landuse"]=="09"]
-                
+
                 if len(subset_lots_misc) > 0 & len(subset_lots_parks) > 0:
 
                     pop_den = float(population_disaggregate)/sum(subset_lots_misc["lotarea"])
@@ -289,48 +293,48 @@ class DasymetryDisaggregate:
                     total_parks_area = sum(subset_lots_parks["lotarea"])
                     subset_lots_misc["area_ratio"] = subset_lots_misc["lotarea"]/total_misc_area
                     subset_lots__parks["area_ratio"] = subset_lots__parks["lotarea"]/total_parks_area
-                    
+
                         if pop_den <= top_den_allowed:
-                            
+
                             total_misc_area = sum(subset_lots_misc["lotarea"])
                             subset_lots_misc[fieldname] = subset_lots_misc["area_ratio"]*population_disaggregate
 
                             lots.loc[lots.bbl.isin(subset_lots_misc.bbl), [fieldname]] = subset_lots_misc[[fielname]]
 
                         elif pop_den > top_den_allowed:
-                                    
+
                             subset_lots_misc[fieldname] = top_den_allowed*subset_lots_misc["lotarea"]
                             lots.loc[lots.bbl.isin(subset_lots_misc.bbl), [fieldname]] = subset_lots_misc[[fielname]]
-                                    
+
                             remaining_pop = population_disaggregate - sum(subset_lots_misc[fieldname])
-                                    
+
                             pop_den_parks = float(remaining_pop)/sum(subset_lots__parks["lotarea"])
-                                    
+
                             if pop_den_parks <=5:
-                                        
+
                                 total_parks_area = sum(subset_lots__parks["lotarea"])
                                 subset_lots__parks[fieldname] = subset_lots__parks["area_ratio"]*remaining_pop
 
                                 lots.loc[lots.bbl.isin(subset_lots__parks.bbl), [fieldname]] = subset_lots__parks[[fielname]]
-                                
-                            elif pop_den_parks > 5: 
-                                        
+
+                            elif pop_den_parks > 5:
+
                                 subset_lots__parks[fieldname] = 5*subset_lots__parks["lotarea"]
                                 lots.loc[lots.bbl.isin(subset_lots__parks.bbl), [fieldname]] = subset_lots__parks[[fielname]]
-                                        
+
                                 remaining_pop = remaining_pop - sum(subset_lots__parks[fieldname])
-                                        
+
                                 if remaining_pop > 0:
-                                                                        
+
                                     subset_lots_misc[fieldname] = subset_lots_misc[fieldname] + subset_lots_misc["area_ratio"]*remaining_pop
 
                                     lots.loc[lots.bbl.isin(subset_lots_misc.bbl), [fieldname]] = subset_lots_misc[[fielname]]
-                                    
+
                 if len(subset_lots_misc) > 0 & len(subset_lots_parks) == 0:
-                    
+
                     total_misc_area = sum(subset_lots_misc["lotarea"])
                     subset_lots_misc["area_ratio"] = subset_lots_misc["lotarea"]/total_misc_area
-                    
+
                     pop_den = float(population_disaggregate)/sum(subset_lots_misc["lotarea"])
 
                     if pop_den <= top_den_allowed:
@@ -338,16 +342,16 @@ class DasymetryDisaggregate:
                         subset_lots_misc[fieldname] = subset_lots_misc["area_ratio"]*population_disaggregate
 
                         lots.loc[lots.bbl.isin(subset_lots_misc.bbl), [fieldname]] = subset_lots_misc[[fielname]]
-                                    
+
                     elif pop_den > top_den_allowed:
-                                    
+
                         subset_lots_misc[fieldname] = top_den_allowed*subset_lots_misc["lotarea"]
                         lots.loc[lots.bbl.isin(subset_lots_misc.bbl), [fieldname]] = subset_lots_misc[[fielname]]
-                                    
+
                         remaining_pop = population_disaggregate - sum(subset_lots_misc[fieldname])
-                                    
-                        if remaining_pop > 0:                    
-                                    
+
+                        if remaining_pop > 0:
+
 
     def disaggregate_data(self, fieldname, top_hh_size = 2.8, top_den_allowed = 55):
 
@@ -382,19 +386,19 @@ class DasymetryDisaggregate:
         self.parcel_df = self.intersect_counter(self.source_df_centroids, self.parcel_df)
 
         #### 3.1) subset lots that have sourcedata entities within / subset lots that have no sourcedata entities within (count <=1)
-        self.lots_to_aggregateblocks = self.parcel_df[self.parcel_df["count"] > 1]
-        self.lots_to_disaggregateblocks = self.parcel_df[self.parcel_df["count"] <= 1]
+        self.blocks_in_parcels = self.parcel_df[self.parcel_df["count"] > 1]
+        self.parcels_in_blocks = self.parcel_df[self.parcel_df["count"] <= 1]
 
-        #### 3.2) aggregate data of sourcedata within lots_to_aggregateblocks --> loop that goes lot by lot and aggregates the info of
+        #### 3.2) aggregate data of sourcedata within blocks_in_parcels --> loop that goes lot by lot and aggregates the info of
         #### the centroids within
 
-        #### First we need to check whether there is one or more rows in the lots_to_aggregateblocks dataset!
+        #### First we need to check whether there is one or more rows in the blocks_in_parcels dataset!
 
-        if len(self.lots_to_aggregateblocks) > 0:
+        if len(self.blocks_in_parcels) > 0:
 
             self.aggregated_lots = source_aggregator(fieldname)
 
-        #### 4) take lots_to_disaggregateblocks and run disaggregation
+        #### 4) take parcels_in_blocks and run disaggregation
 
         #### 4.1) Loop per sourcedata entity
         #### 4.2) Retrieve total population / number from sourcedata
