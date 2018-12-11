@@ -1,5 +1,5 @@
 import geopandas
-
+import pandas
 # TODO: write disaggregate_data method
 # TODO: document all methods
 
@@ -63,10 +63,45 @@ class DasymetryDisaggregate:
 
         return self.source_df
 
+    def generate_intersects(self):
+        """ Create two GeoDataFrames containing of (a) parcels whose centroids
+            lie within each census block, and (b) census blocks whose centroids
+            lie within each parcel.
+        """
+
+        # Create copies of the source shapefiles, substituting their geometry
+        # for their centroids (point feature)
+        def polygon_to_point(df):
+            df_with centroid = df.copy()
+            df_with_centroid['geometry'] = df.centroid
+
+            return df_with_centroid
+
+        # Join all points that lie in a polygon with that feature
+        def find_intersects(df_polygon, df_centroids):
+            datasubset = [geopandas.sjoin(df_polygon.loc[[k]],
+                                                 df_centroids)
+                                 for k in df_polygon.index]
+            return pandas.concat(datasubset)
+
+        # Then, we find the two "centroid in polygon datasets"
+        parcel_centroid = polygon_to_point(self.parcel_df)
+        source_centroid = polygon_to_point(self.source_df)
+
+        self.blocks_in_parcels = find_intersects(self.parcel_df,
+                                                 source_centroid)
+
+        # We only care about tax lots that contain > 1 census blocks, like
+        # in Stuyvesant Town (1 parcel, 15 tax lots). Keep only duplicates.
+        self.blocks_in_parcels = blocks_in_parcels[blocks_in_parcels.index.duplicated(keep=False)]
+
+        self.parcels_in_blocks = find_intersects(self.source_df,
+                                                 parcel_centroid)
+
     def intersect_counter(self, centroids, boundaries):
 
-        """ A function that will count the number of centroids that fall within
-            the boundaries of another layer.
+        """ A function that will count the number of centroids that lie within
+            another layer.
 
             Input:
             ------
@@ -84,28 +119,11 @@ class DasymetryDisaggregate:
         boundaries["count"] = 0
 
         for i, bound in enumerate(boundaries):
-            # inter_count=0
             CD = boundaries.loc[[i]]
             inter_count = sum(centroids.intersects(CD))
             boundaries.loc[i,"count"] = inter_count
 
         return boundaries
-
-    def source_aggregator (self, source_data, lots_data, fieldname):
-        lots_data["total"] = 0 # initialize field where info will be aggregated
-
-        # Loop through subset values indexes.
-        for index in lots_data.index:
-            lot = lots_data[[index]] # subsample one single lot
-
-            # subset blocks that locate within the subsampled lot
-            subset = source_data[source_data.centroid.intersects(lot)]
-
-            # Sum of all the values of the fieldname written in the column of
-            # aggregated values
-            lots_data.loc[index, "total"] = sum(subset[fieldname])
-
-        return lots_data
 
     def source_aggregator(self, fieldname):
         source_data=self.source_df
@@ -118,7 +136,7 @@ class DasymetryDisaggregate:
         return lots_data
 
     
-    def source_disaggregator(self, fieldname, top_hh_size, top_den):
+    def source_disaggregator(self, fieldname, top_hh_size, top_den_allowed):
         
         lots = self.lots_to_disaggregateblocks
         blocks = self.source_df
@@ -331,7 +349,7 @@ class DasymetryDisaggregate:
                         if remaining_pop > 0:                    
                                     
 
-    def disaggregate_data(self, fieldname, top_hh_size = 2.8, top_den = 55):
+    def disaggregate_data(self, fieldname, top_hh_size = 2.8, top_den_allowed = 55):
 
         """ Disaggregate fieldname from source_df into parcels.
 
@@ -371,8 +389,8 @@ class DasymetryDisaggregate:
         #### the centroids within
 
         #### First we need to check whether there is one or more rows in the lots_to_aggregateblocks dataset!
+
         if len(self.lots_to_aggregateblocks) > 0:
-            self.aggregated_lots = source_aggregator(self.source_df, self.parcel_df, fieldname)
 
             self.aggregated_lots = source_aggregator(fieldname)
 
@@ -420,7 +438,8 @@ class DasymetryDisaggregate:
 
             outputdir (str): Directory path to save data (default = ./output/)
 
-            drop_geometry (bool): Whether to drop geometry column in output (default False)
+            drop_geometry (bool): Whether to drop geometry column in output
+            (default False)
 
             driver (str): Supported file driver. Check fiona.supported_drivers
             for compatibility.
