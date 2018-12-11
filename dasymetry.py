@@ -1,5 +1,5 @@
 import geopandas
-
+import pandas
 # TODO: write disaggregate_data method
 # TODO: document all methods
 
@@ -63,10 +63,45 @@ class DasymetryDisaggregate:
 
         return self.source_df
 
+    def generate_intersects(self):
+        """ Create two GeoDataFrames containing of (a) parcels whose centroids
+            lie within each census block, and (b) census blocks whose centroids
+            lie within each parcel.
+        """
+
+        # Create copies of the source shapefiles, substituting their geometry
+        # for their centroids (point feature)
+        def polygon_to_point(df):
+            df_with centroid = df.copy()
+            df_with_centroid['geometry'] = df.centroid
+
+            return df_with_centroid
+
+        # Join all points that lie in a polygon with that feature
+        def find_intersects(df_polygon, df_centroids):
+            datasubset = [geopandas.sjoin(df_polygon.loc[[k]],
+                                                 df_centroids)
+                                 for k in df_polygon.index]
+            return pandas.concat(datasubset)
+
+        # Then, we find the two "centroid in polygon datasets"
+        parcel_centroid = polygon_to_point(self.parcel_df)
+        source_centroid = polygon_to_point(self.source_df)
+
+        self.blocks_in_parcels = find_intersects(self.parcel_df,
+                                                 source_centroid)
+
+        # We only care about tax lots that contain > 1 census blocks, like
+        # in Stuyvesant Town (1 parcel, 15 tax lots). Keep only duplicates.
+        self.blocks_in_parcels = blocks_in_parcels[blocks_in_parcels.index.duplicated(keep=False)]
+
+        self.parcels_in_blocks = find_intersects(self.source_df,
+                                                 parcel_centroid)
+
     def intersect_counter(self, centroids, boundaries):
 
-        """ A function that will count the number of centroids that fall within
-            the boundaries of another layer.
+        """ A function that will count the number of centroids that lie within
+            another layer.
 
             Input:
             ------
@@ -84,7 +119,6 @@ class DasymetryDisaggregate:
         boundaries["count"] = 0
 
         for i, bound in enumerate(boundaries):
-            # inter_count=0
             CD = boundaries.loc[[i]]
             inter_count = sum(centroids.intersects(CD))
             boundaries.loc[i,"count"] = inter_count
@@ -110,27 +144,27 @@ class DasymetryDisaggregate:
             subset_lots = lots[lots.centroid.intersects(blocks)]
             res_lots = sum(subset_lots["unitsres"])
 
-            
+
             if res_lots > 0:
-                
+
                 res_pop_ratio = population_disaggregate/res_lots
                 subset_lots_residential = subset_lots[subset_lots["unitres"]>0]
-                
+
                 if res_pop_ratio <= top_hh_size:
-                                       
+
                     subset_lots_residential[fieldname] = res_pop_ratio * subset_lots["unitres"]
                     lots.loc[lots.bbl.isin(subset_lots.bbl), [fieldname]] = subset_lots_residential[[fielname]]
-                    
+
                 else if population_disaggregate > top_hh_size:
-                    
+
                     subset_lots_residential[fieldname] = res_pop_ratio * top_hh_size
                     remaining_pop = population_disaggregate - sum(subset_lots_residential[fieldname])
-                    
-            
-            else if res_lots == 0:
-            
 
-    def disaggregate_data(self, fieldname, top_hh_size = 2.8):
+
+            else if res_lots == 0:
+
+
+    def disaggregate_data(self, fieldname, top_hh_size=2.8):
 
         """ Disaggregate fieldname from source_df into parcels.
 
@@ -219,7 +253,8 @@ class DasymetryDisaggregate:
 
             outputdir (str): Directory path to save data (default = ./output/)
 
-            drop_geometry (bool): Whether to drop geometry column in output (default False)
+            drop_geometry (bool): Whether to drop geometry column in output
+            (default False)
 
             driver (str): Supported file driver. Check fiona.supported_drivers
             for compatibility.
