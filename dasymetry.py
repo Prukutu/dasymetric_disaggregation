@@ -150,16 +150,22 @@ class DasymetryDisaggregate:
 
     def pop_misc_parks(fieldname, remaining_pop, misc_lots, parks_lots, top_den_allowed):
 
+        # Get area of all miscellaneous lots in the current subset
         total_misc_area = sum(misc_lots["lotarea"])
         misc_lots["area_ratio"] = misc_lots["lotarea"]/total_misc_area
 
+        # Repeat with parks
         total_parks_area = sum(parks_lots["lotarea"])
         parks_lots["area_ratio"] = parks_lots["lotarea"]/total_parks_area
 
-        if len(misc_lots) > 0 & len(parks_lots) > 0:
+        # Case 1: There's both miscellaneous and parks
+        if len(misc_lots) > 0 and len(parks_lots) > 0:
 
+            # Get population density of remaining population in misc area
             pop_den = float(remaining_pop)/total_misc_area
 
+            # if pop_dens is below the allowed value, assign population to those
+            # lots, weighted by area.
             if pop_den <= top_den_allowed:
 
                 misc_lots[fieldname] = misc_lots["area_ratio"]*remaining_pop
@@ -178,7 +184,9 @@ class DasymetryDisaggregate:
 
                 pop_den_parks = float(remaining_pop)/total_parks_area
 
-                if pop_den_parks <=5:
+                # Should we make this a parameter? It can be a keyword argument
+                # with the same default value.
+                if pop_den_parks <= 5:
 
                     parks_lots[fieldname] = parks_lots["area_ratio"]*remaining_pop
 
@@ -194,7 +202,7 @@ class DasymetryDisaggregate:
 
                     remaining_pop = remaining_pop - sum(parks_lots[fieldname])
 
-        elif len(misc_lots) > 0 & len(parks_lots) == 0:
+        elif len(misc_lots) > 0 and len(parks_lots) == 0:
 
             pop_den = float(remaining_pop)/total_misc_area
 
@@ -214,11 +222,11 @@ class DasymetryDisaggregate:
 
                 remaining_pop = remaining_pop - sum(misc_lots[fieldname])
 
-        elif len(misc_lots) == 0 & len(parks_lots) > 0:
+        elif len(misc_lots) == 0 and len(parks_lots) > 0:
 
             pop_den_parks = float(remaining_pop)/total_parks_area
 
-            if pop_den_parks <=5:
+            if pop_den_parks <= 5:
 
                 parks_lots[fieldname] = parks_lots["area_ratio"]*remaining_pop
 
@@ -234,11 +242,11 @@ class DasymetryDisaggregate:
 
                 remaining_pop = remaining_pop - sum(parks_lots[fieldname])
 
-        elif len(misc_lots) == 0 & len(parks_lots) == 0:
+        elif len(misc_lots) == 0 and len(parks_lots) == 0:
 
             pass
 
-        return(remaining_pop)
+        return remaining_pop
 
 
 
