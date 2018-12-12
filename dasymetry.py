@@ -15,7 +15,7 @@ class DasymetryDisaggregate:
 
         return None
 
-    def load_parcels(self, filename):
+    def load_parcels(self, filename, fid='bbl'):
 
         """ Method to load parcel geometry. Uses geopandas to load a shapefile
             into a GeoDataFrame.
@@ -25,6 +25,9 @@ class DasymetryDisaggregate:
             filename (str): string describing parcel file name, including
             absolute path to directory containing the files, if not the current
             working directory.
+
+            fid (str): Name of the column name that identifies each parcel.
+            Default bbl from NYC MapPLUTO.
 
             Output:
             -------
@@ -36,11 +39,16 @@ class DasymetryDisaggregate:
         self.parcel_df = geopandas.read_file(filename)
 
         print(filename + ' loaded!')
+
+        # Make all column names lowercase
         self.parcel_df.columns = map(str.lower, self.parcel_df.columns)
+
+        # Make fid into the GeoDataFrame index.
+        self.parcel_df.set_index(fid, inplace=True)
 
         return self.parcel_df
 
-    def load_source_data(self, filename):
+    def load_source_data(self, filename, fid='BLOCKID10'):
 
         """ Method to load source data and geometry. Uses geopandas to load a
             shapefile into a GeoDataFrame.
@@ -50,6 +58,9 @@ class DasymetryDisaggregate:
             filename (str): string describing parcel file name, including
             absolute path to directory containing the files, if not the current
             working directory.
+
+            fid (str): Name of the column name that identifies each parcel.
+            Default BLOCKID10, from US Census.
 
             Output:
             -------
@@ -61,12 +72,16 @@ class DasymetryDisaggregate:
         self.source_df = geopandas.read_file(filename)
         self.source_df.columns = map(str.lower, self.source_df.columns)
 
+        # Make fid into the GeoDataFrame index.
+        self.source_df.set_index(fid, inplace=True)
+
         return self.source_df
 
     def generate_intersects(self):
         """ Create two GeoDataFrames containing of (a) parcels whose centroids
             lie within each census block, and (b) census blocks whose centroids
             lie within each parcel.
+
         """
 
         # Create copies of the source shapefiles, substituting their geometry
@@ -98,42 +113,32 @@ class DasymetryDisaggregate:
         self.parcels_in_blocks = find_intersects(self.source_df,
                                                  parcel_centroid)
 
-    def intersect_counter(self, centroids, boundaries):
-
-        """ A function that will count the number of centroids that lie within
-            another layer.
+    def source_aggregator(self, fieldname):
+        """ Method that takes parcels that contain more than one source block,
+            aggregates the data, then assign its sum to the parcel.
 
             Input:
-            ------
-            centroids (float): Centroid coordinates of each source layer to
-            disaggregate.
-
-            boundaries (GeoDataFrame ?): Boundaries of the target layer.
+            ======
+            self.source_df:
+            self.parcels_df:
+            self.blocks_in_parcels
 
             Output:
-            -------
-            boundaries (GeoDataFrame): Boundaries GeoDataFrame containing number
-            of intersecting source centroids.
+            =======
+            Writes the aggregated block data to parcels_df
         """
-
-        boundaries["count"] = 0
-
-        for i, bound in enumerate(boundaries):
-            CD = boundaries.loc[[i]]
-            inter_count = sum(centroids.intersects(CD))
-            boundaries.loc[i,"count"] = inter_count
-
-        return boundaries
-
-    def source_aggregator(self, fieldname):
         source_data=self.source_df
-        lots_data=self.lots_to_aggregateblocks
-        for index in lots_data.index: #### !!!! I USE INDEXES IN THE LOOP BECAUSE THEY DONT GO 1 BY 1 ANYMORE AFTER THE SUBSET !!!!
-            lot = lots_data[[index]] # subsample one single lot
-            subset = source_data[source_data.centroid.intersects(lot)] # subset blocks that locate within the subsampled lot
-            lots_data.loc[index, fieldname] = sum(subset[fieldname]) # Sum of all the values of the fieldname written in the column of aggregated values
+        lots_data=self.blocks_in_parcels
 
-        return lots_data
+        # Group lots_data by lot index, then sum all values under fieldname
+
+        data_sums = lots_data.groupby('BBL').sum()[fieldname]
+        lotnames = data_sums['BBL'].unique()
+
+        # Write the sums to their respective lots in parcel_df
+        self.parcels_df.loc[data_sums.index, fieldname] = data_sums.values
+
+        return None
 
     def pop_misc_parks(fieldname, remaining_pop, misc_lots, parks_lots, top_den_allowed):
         
@@ -318,9 +323,9 @@ class DasymetryDisaggregate:
                         
                         self.parcel_df.loc[subset_lots_non_residential.index, fieldname] = subset_lots_non_residential[fieldname].values
                         
-        return None # I understand that the function does not need to return anything, since we already wrote the values in self.parcel_df
-
-    def disaggregate_data(self, fieldname, top_hh_size = 2.8, top_den_allowed = 55):
+    return None # I understand that the function does not need to return anything, since we already wrote the values in self.parcel_df
+    
+  def disaggregate_data(self, fieldname, top_hh_size = 2.8, top_den_allowed = 55):
 
         """ Disaggregate fieldname from source_df into parcels.
 
@@ -353,19 +358,19 @@ class DasymetryDisaggregate:
         self.parcel_df = self.intersect_counter(self.source_df_centroids, self.parcel_df)
 
         #### 3.1) subset lots that have sourcedata entities within / subset lots that have no sourcedata entities within (count <=1)
-        self.lots_to_aggregateblocks = self.parcel_df[self.parcel_df["count"] > 1]
-        self.lots_to_disaggregateblocks = self.parcel_df[self.parcel_df["count"] <= 1]
+        self.blocks_in_parcels = self.parcel_df[self.parcel_df["count"] > 1]
+        self.parcels_in_blocks = self.parcel_df[self.parcel_df["count"] <= 1]
 
-        #### 3.2) aggregate data of sourcedata within lots_to_aggregateblocks --> loop that goes lot by lot and aggregates the info of
+        #### 3.2) aggregate data of sourcedata within blocks_in_parcels --> loop that goes lot by lot and aggregates the info of
         #### the centroids within
 
-        #### First we need to check whether there is one or more rows in the lots_to_aggregateblocks dataset!
+        #### First we need to check whether there is one or more rows in the blocks_in_parcels dataset!
 
-        if len(self.lots_to_aggregateblocks) > 0:
+        if len(self.blocks_in_parcels) > 0:
 
             self.aggregated_lots = source_aggregator(fieldname)
 
-        #### 4) take lots_to_disaggregateblocks and run disaggregation
+        #### 4) take parcels_in_blocks and run disaggregation
 
         #### 4.1) Loop per sourcedata entity
         #### 4.2) Retrieve total population / number from sourcedata
