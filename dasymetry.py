@@ -245,8 +245,8 @@ class DasymetryDisaggregate:
     def source_disaggregator(self, fieldname, top_hh_size, top_den_allowed):
 
 
-        for index in self.lots_to_disaggregateblocks.index:
-            population_disaggregate = self.lots_to_disaggregateblocks.loc[index,fieldname]
+        for index in self.parcels_in_blocks.index:
+            population_disaggregate = self.parcels_in_blocks.loc[index,fieldname]
             subset_lots = lots[lots.centroid.intersects(blocks)] #####NEED TO REPLACE WITH THE MAGIC FROM LUIS
             res_units = sum(subset_lots["unitsres"])
 
