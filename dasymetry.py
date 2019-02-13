@@ -248,7 +248,7 @@ class DasymetryDisaggregate:
         for index in self.parcels_in_blocks.index:
             population_disaggregate = self.parcels_in_blocks.loc[index,fieldname]
             bbls_to_join = geopandas.sjoin(self.parcel_df.centroids, self.parcels_in_blocks.loc[index])
-            subset_lots = geopandas.sjoin(parcel_df) 
+            ### TO BE COMPLETED subset_lots = geopandas.sjoin(parcel_df) 
             res_units = sum(subset_lots["unitsres"])
 
             if res_units > 0:
