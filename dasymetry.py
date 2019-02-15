@@ -26,7 +26,7 @@ class DasymetryDisaggregate:
             absolute path to directory containing the files, if not the current
             working directory.
 
-            fid (str): Name of the column name that identifies each parcel.
+            fid (str): Column name of parcel identifier.
             Default bbl from NYC MapPLUTO.
 
             Output:
@@ -111,13 +111,17 @@ class DasymetryDisaggregate:
         parcel_centroid = polygon_to_point(self.parcel_df)
         source_centroid = polygon_to_point(self.source_df)
 
-        self.blocks_in_parcels = find_intersects(self.parcel_df,
+        # Parcels which contain more than one census block within
+        # e.g., Stuyvesant Town
+        self.overpop_parcels = find_intersects(self.parcel_df,
                                                  source_centroid)
 
         # We only care about tax lots that contain > 1 census blocks, like
         # in Stuyvesant Town (1 parcel, 15 tax lots). Keep only duplicates.
-        self.blocks_in_parcels = self.blocks_in_parcels[self.blocks_in_parcels.index.duplicated(keep=False)]
+        self.overpop_parcels = self.overpop_parcels[self.overpop_parcels.index.duplicated(keep=False)]
 
+        # Blocks that contain more than one parcel. This is the most common
+        # case.
         self.parcels_in_blocks = find_intersects(self.source_df,
                                                  parcel_centroid)
 
@@ -129,14 +133,14 @@ class DasymetryDisaggregate:
             ======
             self.source_df:
             self.parcel_df:
-            self.blocks_in_parcels
+            self.overpop_parcels
 
             Output:
             =======
             Writes the aggregated block data to parcel_df
         """
         source_data=self.source_df
-        lots_data=self.blocks_in_parcels
+        lots_data=self.overpop_parcels
 
         # Group lots_data by lot index, then sum all values under fieldname
 
@@ -255,6 +259,8 @@ class DasymetryDisaggregate:
 
         for index in self.lots_to_disaggregateblocks.index:
             population_disaggregate = self.lots_to_disaggregateblocks.loc[index,fieldname]
+
+
             subset_lots = lots[lots.centroid.intersects(blocks)] #####NEED TO REPLACE WITH THE MAGIC FROM LUIS
             res_units = sum(subset_lots["unitsres"])
 
@@ -374,15 +380,15 @@ class DasymetryDisaggregate:
         self.parcel_df = self.intersect_counter(self.source_df_centroids, self.parcel_df)
 
         #### 3.1) subset lots that have sourcedata entities within / subset lots that have no sourcedata entities within (count <=1)
-        self.blocks_in_parcels = self.parcel_df[self.parcel_df["count"] > 1]
+        self.overpop_parcels = self.parcel_df[self.parcel_df["count"] > 1]
         self.parcels_in_blocks = self.parcel_df[self.parcel_df["count"] <= 1]
 
-        #### 3.2) aggregate data of sourcedata within blocks_in_parcels --> loop that goes lot by lot and aggregates the info of
+        #### 3.2) aggregate data of sourcedata within overpop_parcels --> loop that goes lot by lot and aggregates the info of
         #### the centroids within
 
-        #### First we need to check whether there is one or more rows in the blocks_in_parcels dataset!
+        #### First we need to check whether there is one or more rows in the overpop_parcels dataset!
 
-        if len(self.blocks_in_parcels) > 0:
+        if len(self.overpop_parcels) > 0:
 
             self.aggregated_lots = source_aggregator(fieldname)
 
